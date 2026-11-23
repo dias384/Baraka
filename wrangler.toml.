@@ -1,0 +1,3 @@
+name = "baraka-ai"
+main = "Worker.js"
+compatibility_date = "2026-11-23"
