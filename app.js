@@ -77,4 +77,67 @@
   if("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
   }
+
+  // BARAKA INITIATIVE — suggestions locales basées sur les données déjà enregistrées.
+  const initiativeMessage = $("initiativeMessage");
+  const initiativeStatus = $("initiativeStatus");
+  const suggestionPool = [
+    "Choisis une seule petite action qui ferait avancer un de tes projets.",
+    "Relis une note récente : y a-t-il une idée que tu peux transformer en tâche ?",
+    "Prends un instant pour vérifier si tes priorités correspondent toujours à ce qui compte pour toi.",
+    "Tu peux avancer sans tout faire aujourd'hui : sélectionne la prochaine étape la plus simple."
+  ];
+
+  function buildInitiative() {
+    const openTasks = data.tasks.filter(t => !t.done);
+    const recentNote = data.notes[0];
+    const project = data.projects[0];
+
+    if (openTasks.length) {
+      return `Tu as ${openTasks.length} tâche${openTasks.length > 1 ? "s" : ""} en attente. Une bonne prochaine étape serait : « ${openTasks[0].text} ». Veux-tu commencer par celle-ci ?`;
+    }
+    if (project) {
+      return `Ton projet « ${project.name} » est enregistré. Quelle est la plus petite action concrète pour le faire avancer aujourd'hui ?`;
+    }
+    if (recentNote) {
+      return `Tu as récemment noté : « ${recentNote.text} ». Souhaites-tu en faire une tâche ou approfondir cette idée ?`;
+    }
+    return suggestionPool[new Date().getDate() % suggestionPool.length];
+  }
+
+  function refreshInitiative() {
+    if (initiativeMessage) initiativeMessage.textContent = buildInitiative();
+  }
+
+  $("refreshInitiative")?.addEventListener("click", refreshInitiative);
+  refreshInitiative();
+
+  $("enableNotifications")?.addEventListener("click", async () => {
+    if (!("Notification" in window)) {
+      initiativeStatus.textContent = "Les notifications ne sont pas prises en charge par ce navigateur.";
+      return;
+    }
+    if (!("serviceWorker" in navigator)) {
+      initiativeStatus.textContent = "Le service worker est indisponible dans ce navigateur.";
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        initiativeStatus.textContent = "Autorisation non accordée. Tu peux la modifier dans les réglages de ton iPhone.";
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification("Baraka Initiative", {
+        body: buildInitiative(),
+        icon: "./icon-192.png",
+        badge: "./icon-192.png",
+        tag: "baraka-initiative-test"
+      });
+      initiativeStatus.textContent = "Autorisation accordée. Une notification de test vient d'être envoyée.";
+    } catch (error) {
+      initiativeStatus.textContent = "Impossible d'afficher la notification. Vérifie que Baraka est installé sur l'écran d'accueil et réessaie.";
+    }
+  });
+
 })();
