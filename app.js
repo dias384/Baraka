@@ -1,3 +1,4 @@
+
 (() => {
   const KEY = "baraka.v2.data";
   const $ = (id) => document.getElementById(id);
@@ -78,7 +79,7 @@
     window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
   }
 
-  // BARAKA INITIATIVE — suggestions locales basées sur les données déjà enregistrées.
+  // BARAKA INITIATIVE
   const initiativeMessage = $("initiativeMessage");
   const initiativeStatus = $("initiativeStatus");
   const suggestionPool = [
@@ -137,6 +138,96 @@
       initiativeStatus.textContent = "Autorisation accordée. Une notification de test vient d'être envoyée.";
     } catch (error) {
       initiativeStatus.textContent = "Impossible d'afficher la notification. Vérifie que Baraka est installé sur l'écran d'accueil et réessaie.";
+    }
+  });
+
+  // BARAKA IA — discussion reliée au Worker Cloudflare.
+  const BARAKA_API_URL = "https://baraka-ai.shebiche.workers.dev";
+  const chatStyle = document.createElement("style");
+  chatStyle.textContent = `
+    #barakaAiLauncher{position:fixed;right:18px;bottom:18px;z-index:9998;border:0;border-radius:999px;padding:14px 18px;background:#243b32;color:#fff;font:600 15px system-ui;box-shadow:0 5px 20px #0003}
+    #barakaAiPanel{position:fixed;right:14px;bottom:76px;z-index:9999;width:min(370px,calc(100vw - 28px));height:min(520px,70vh);background:#fff;color:#202520;border:1px solid #ddd;border-radius:18px;box-shadow:0 8px 30px #0003;display:none;overflow:hidden;font:14px system-ui}
+    #barakaAiPanel.open{display:flex;flex-direction:column}
+    #barakaAiHead{padding:14px 16px;background:#243b32;color:white;display:flex;justify-content:space-between;align-items:center;font-weight:700}
+    #barakaAiClose{background:transparent;color:white;border:0;font-size:22px;padding:0 4px}
+    #barakaAiMessages{padding:12px;overflow:auto;flex:1;background:#f7f8f6}
+    .barakaAiBubble{padding:10px 12px;margin:8px 0;border-radius:13px;max-width:88%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.4}
+    .barakaAiUser{background:#dcebe2;margin-left:auto}
+    .barakaAiBot{background:white;border:1px solid #e5e8e4;margin-right:auto}
+    #barakaAiForm{display:flex;gap:8px;padding:10px;border-top:1px solid #e5e5e5;background:white}
+    #barakaAiInput{min-width:0;flex:1;border:1px solid #ccd3cd;border-radius:12px;padding:10px;font:14px system-ui}
+    #barakaAiSend{border:0;border-radius:12px;background:#243b32;color:white;padding:0 15px;font-weight:600}
+    #barakaAiStatus{font-size:12px;color:#657067;padding:0 12px 8px;background:white}
+  `;
+  document.head.appendChild(chatStyle);
+
+  const chatLauncher = document.createElement("button");
+  chatLauncher.id = "barakaAiLauncher";
+  chatLauncher.type = "button";
+  chatLauncher.textContent = "✦ Parler à Baraka";
+  chatLauncher.setAttribute("aria-label", "Ouvrir la discussion avec Baraka");
+
+  const chatPanel = document.createElement("section");
+  chatPanel.id = "barakaAiPanel";
+  chatPanel.setAttribute("aria-label", "Discussion avec Baraka");
+  chatPanel.innerHTML = `
+    <div id="barakaAiHead"><span>✦ Baraka IA</span><button id="barakaAiClose" type="button" aria-label="Fermer">×</button></div>
+    <div id="barakaAiMessages" aria-live="polite"><div class="barakaAiBubble barakaAiBot">Salam ! Je suis Baraka. Que puis-je faire pour toi ?</div></div>
+    <div id="barakaAiStatus">Prêt à discuter.</div>
+    <form id="barakaAiForm"><input id="barakaAiInput" type="text" placeholder="Écris ton message…" maxlength="3000" autocomplete="off" required><button id="barakaAiSend" type="submit">Envoyer</button></form>
+  `;
+  document.body.append(chatLauncher, chatPanel);
+
+  const chatMessages = $("barakaAiMessages");
+  const chatStatus = $("barakaAiStatus");
+  const chatInput = $("barakaAiInput");
+  const chatSend = $("barakaAiSend");
+  const conversation = [];
+
+  function addChatBubble(content, who) {
+    const bubble = document.createElement("div");
+    bubble.className = "barakaAiBubble " + (who === "user" ? "barakaAiUser" : "barakaAiBot");
+    bubble.textContent = content;
+    chatMessages.appendChild(bubble);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  chatLauncher.addEventListener("click", () => {
+    chatPanel.classList.add("open");
+    chatInput.focus();
+  });
+  $("barakaAiClose").addEventListener("click", () => chatPanel.classList.remove("open"));
+
+  $("barakaAiForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const message = chatInput.value.trim();
+    if (!message || chatSend.disabled) return;
+
+    addChatBubble(message, "user");
+    conversation.push({ role: "user", content: message });
+    chatInput.value = "";
+    chatSend.disabled = true;
+    chatStatus.textContent = "Baraka prépare sa réponse…";
+
+    try {
+      const response = await fetch(BARAKA_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: conversation.slice(-10) })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Erreur serveur (" + response.status + ").");
+      if (typeof result.reply !== "string" || !result.reply.trim()) throw new Error("Aucune réponse reçue.");
+      conversation.push({ role: "assistant", content: result.reply });
+      addChatBubble(result.reply, "assistant");
+      chatStatus.textContent = "Réponse reçue.";
+    } catch (error) {
+      conversation.pop();
+      addChatBubble("Je n'arrive pas à joindre le serveur. " + error.message, "assistant");
+      chatStatus.textContent = "Connexion à l'IA impossible.";
+    } finally {
+      chatSend.disabled = false;
+      chatInput.focus();
     }
   });
 
