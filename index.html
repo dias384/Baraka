@@ -3,64 +3,90 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#101522">
-  <meta name="description" content="Baraka, ton assistant personnel.">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css">
-  <title>Baraka</title>
+  <meta name="theme-color" content="#0b1220">
+  <meta name="description" content="Baraka — ton espace personnel pour penser, organiser et avancer.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./style.css">
+  <title>Baraka — Ton espace personnel</title>
 </head>
 <body>
-  <main class="app">
-    <header>
-      <div class="brand"><div class="mark">ب</div><div><h1>Baraka</h1><p>Ton espace personnel</p></div></div>
-      <span class="status"><i></i> Prêt</span>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Baraka accueil">
+        <span class="brand-mark">ب</span>
+        <span><strong>Baraka</strong><small>Ton espace personnel</small></span>
+      </a>
+      <span class="status"><i></i> En local</span>
     </header>
 
-    <section class="hero">
-      <p class="eyebrow">ASSISTANT PERSONNEL</p>
-      <h2>Salam.<br><span>Que souhaites-tu faire ?</span></h2>
-      <p class="sub">Tes idées, tes notes et tes tâches au même endroit.</p>
-      <button id="voiceBtn" class="voice"><span class="mic">🎙</span><span id="voiceLabel">Parler à Baraka</span></button>
-      <p id="voiceHint" class="hint">La commande vocale dépend des fonctions disponibles dans ton navigateur.</p>
-    </section>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">TON ESPACE POUR AVANCER</p>
+        <h1>Salam.<br><span>On avance ?</span></h1>
+        <p class="hero-copy">Dépose tes idées. Clarifie tes priorités. Transforme-les en actions.</p>
+        <div class="capture">
+          <label for="quickInput">Qu'est-ce que tu veux garder en tête ?</label>
+          <textarea id="quickInput" rows="2" placeholder="Une idée, une tâche, un objectif…"></textarea>
+          <div class="capture-actions">
+            <select id="captureType" aria-label="Type de contenu">
+              <option value="note">Note</option><option value="task">Tâche</option>
+            </select>
+            <button class="primary" id="captureBtn">＋ Ajouter</button>
+          </div>
+        </div>
+      </section>
 
-    <nav class="tabs" aria-label="Sections">
-      <button class="tab active" data-tab="home">Accueil</button>
-      <button class="tab" data-tab="notes">Notes</button>
-      <button class="tab" data-tab="tasks">Tâches</button>
-    </nav>
+      <nav class="tabs" aria-label="Navigation principale">
+        <button class="tab active" data-view="home">Vue d'ensemble</button>
+        <button class="tab" data-view="notes">Notes</button>
+        <button class="tab" data-view="tasks">Tâches</button>
+        <button class="tab" data-view="projects">Projets</button>
+      </nav>
 
-    <section id="home" class="panel">
-      <div class="section-head"><div><p class="eyebrow">TON ESPACE</p><h3>Vue d’ensemble</h3></div></div>
-      <div class="stats">
-        <div class="stat"><strong id="noteCount">0</strong><span>Notes</span></div>
-        <div class="stat"><strong id="taskCount">0</strong><span>Tâches à faire</span></div>
-      </div>
-      <div class="card">
-        <h3>Discuter avec Baraka</h3>
-        <p class="muted">Cette première version fonctionne en démonstration : elle peut organiser tes notes et tâches. Les réponses IA connectées viendront dans une prochaine étape.</p>
-        <div id="chatLog" class="chat-log"><div class="bubble bot">Bienvenue ! Je suis Baraka. Tu peux me demander de t'aider à organiser tes idées, ou ajouter une note ou une tâche dans les onglets.</div></div>
-        <form id="chatForm" class="composer"><input id="chatInput" placeholder="Écris un message…" autocomplete="off"><button aria-label="Envoyer">➤</button></form>
-      </div>
-      <div class="card tip"><span>✦</span><div><b>Un premier pas à la fois</b><p class="muted">Ajoute une note ou une tâche pour commencer à utiliser ton espace.</p></div></div>
-    </section>
+      <section id="homeView" class="view">
+        <div class="section-heading"><div><p class="eyebrow">TON TABLEAU DE BORD</p><h2>Vue d'ensemble</h2></div><span id="todayLabel" class="date-label"></span></div>
+        <div class="stats">
+          <article class="stat"><span id="noteCount">0</span><small>Notes gardées</small></article>
+          <article class="stat"><span id="taskCount">0</span><small>Tâches ouvertes</small></article>
+          <article class="stat"><span id="projectCount">0</span><small>Projets actifs</small></article>
+        </div>
+        <article class="panel daily">
+          <p class="eyebrow">LE CAP DU JOUR</p>
+          <h3>Quelle est ta prochaine petite avancée ?</h3>
+          <p>Choisis une action réaliste. Baraka t'aide à garder le fil, sans te surcharger.</p>
+          <button class="secondary" data-jump="tasks">Voir mes tâches <span>→</span></button>
+        </article>
+        <div class="section-heading"><div><p class="eyebrow">À NE PAS PERDRE DE VUE</p><h2>Récemment ajouté</h2></div></div>
+        <div id="recentList" class="stack"></div>
+        <article class="panel privacy"><span class="privacy-icon">◆</span><div><strong>Tes données restent sur cet appareil</strong><p>Cette version enregistre tes notes et tâches dans le stockage local du navigateur. Elles ne sont pas synchronisées entre appareils.</p></div></article>
+      </section>
 
-    <section id="notes" class="panel hidden">
-      <div class="section-head"><div><p class="eyebrow">MÉMOIRE PERSONNELLE</p><h3>Mes notes</h3></div></div>
-      <form id="noteForm" class="add-form"><input id="noteInput" placeholder="Écris une nouvelle note…" maxlength="500" required><button>Ajouter</button></form>
-      <ul id="notesList" class="items"></ul>
-      <p id="notesEmpty" class="empty">Aucune note pour le moment.</p>
-    </section>
+      <section id="notesView" class="view hidden">
+        <div class="section-heading"><div><p class="eyebrow">CAPTURER</p><h2>Mes notes</h2></div></div>
+        <div id="notesList" class="stack"></div>
+        <p id="notesEmpty" class="empty">Tes idées importantes trouveront leur place ici.</p>
+      </section>
 
-    <section id="tasks" class="panel hidden">
-      <div class="section-head"><div><p class="eyebrow">À FAIRE</p><h3>Mes tâches</h3></div></div>
-      <form id="taskForm" class="add-form"><input id="taskInput" placeholder="Quelle est la prochaine tâche ?" maxlength="180" required><button>Ajouter</button></form>
-      <ul id="tasksList" class="items"></ul>
-      <p id="tasksEmpty" class="empty">Aucune tâche pour le moment.</p>
-    </section>
+      <section id="tasksView" class="view hidden">
+        <div class="section-heading"><div><p class="eyebrow">PASSER À L'ACTION</p><h2>Mes tâches</h2></div></div>
+        <div id="tasksList" class="stack"></div>
+        <p id="tasksEmpty" class="empty">Aucune tâche pour le moment. Ajoute une première action depuis le haut de l'écran.</p>
+      </section>
 
-    <footer>BARAKA <span>•</span> Version de démonstration · Tes données restent sur cet appareil</footer>
-  </main>
-  <script src="app.js"></script>
+      <section id="projectsView" class="view hidden">
+        <div class="section-heading"><div><p class="eyebrow">CONSTRUIRE DANS LA DURÉE</p><h2>Mes projets</h2></div></div>
+        <div class="project-create"><input id="projectInput" maxlength="80" placeholder="Nom d'un projet…"><button id="projectBtn" class="primary">Créer</button></div>
+        <div id="projectsList" class="stack"></div>
+        <p id="projectsEmpty" class="empty">Un projet commence par une intention claire.</p>
+      </section>
+
+      <section class="voice-panel panel">
+        <div><p class="eyebrow">CAPTURE VOCALE</p><h3>Une idée à l'oral ?</h3><p id="voiceStatus">La dictée dépend de la compatibilité de ton navigateur.</p></div>
+        <button id="voiceBtn" class="voice-button" aria-label="Démarrer la dictée">🎙</button>
+      </section>
+    </main>
+    <footer><span>BARAKA</span><span>Une chose après l'autre.</span></footer>
+  </div>
+  <script src="./app.js"></script>
 </body>
 </html>

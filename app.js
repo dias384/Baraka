@@ -1,38 +1,80 @@
-const $ = id => document.getElementById(id);
-const load = key => { try{return JSON.parse(localStorage.getItem(key)||"[]")}catch{return []} };
-let notes=load("baraka-notes"), tasks=load("baraka-tasks");
-const save=()=>{localStorage.setItem("baraka-notes",JSON.stringify(notes));localStorage.setItem("baraka-tasks",JSON.stringify(tasks));render()};
-function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function render(){
- $("noteCount").textContent=notes.length;
- $("taskCount").textContent=tasks.filter(t=>!t.done).length;
- $("notesList").innerHTML=notes.map((n,i)=>`<li><span>${esc(n)}</span><button data-note="${i}" aria-label="Supprimer">×</button></li>`).join("");
- $("tasksList").innerHTML=tasks.map((t,i)=>`<li class="${t.done?"done":""}"><input type="checkbox" data-task="${i}" ${t.done?"checked":""} aria-label="Terminer"><span>${esc(t.text)}</span><button data-delete="${i}" aria-label="Supprimer">×</button></li>`).join("");
- $("notesEmpty").hidden=notes.length>0;$("tasksEmpty").hidden=tasks.length>0;
-}
-document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("hidden",p.id!==b.dataset.tab))}));
-$("noteForm").addEventListener("submit",e=>{e.preventDefault();let v=$("noteInput").value.trim();if(v){notes.unshift(v);$("noteInput").value="";save()}});
-$("taskForm").addEventListener("submit",e=>{e.preventDefault();let v=$("taskInput").value.trim();if(v){tasks.unshift({text:v,done:false});$("taskInput").value="";save()}});
-document.addEventListener("click",e=>{if(e.target.dataset.note!==undefined){notes.splice(+e.target.dataset.note,1);save()}if(e.target.dataset.delete!==undefined){tasks.splice(+e.target.dataset.delete,1);save()}});
-document.addEventListener("change",e=>{if(e.target.dataset.task!==undefined){tasks[+e.target.dataset.task].done=e.target.checked;save()}});
-function say(text){if("speechSynthesis"in window){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(text))}}
-function reply(message){
- const m=message.toLowerCase();let answer;
- if(m.includes("ajoute une note")||m.startsWith("note ")){let v=message.replace(/^note\s*|ajoute une note\s*/i,"").trim();if(v){notes.unshift(v);save();answer="C’est noté. J’ai ajouté cette note dans Baraka."}else answer="Dis-moi le texte de la note à ajouter."}
- else if(m.includes("ajoute une tâche")||m.startsWith("tâche ")){let v=message.replace(/^tâche\s*|ajoute une tâche\s*/i,"").trim();if(v){tasks.unshift({text:v,done:false});save();answer="C’est ajouté à ta liste de tâches."}else answer="Quelle tâche veux-tu ajouter ?"}
- else if(m.includes("combien")||m.includes("résumé")) answer=`Tu as ${notes.length} note(s) et ${tasks.filter(t=>!t.done).length} tâche(s) à faire.`;
- else answer="Je suis en mode démonstration pour le moment. Tu peux me dire « ajoute une note … » ou « ajoute une tâche … ». La connexion à une véritable IA sera ajoutée dans une prochaine étape.";
- addBubble(answer,"bot");
-}
-function addBubble(text,who){let d=document.createElement("div");d.className="bubble "+who;d.textContent=text;$("chatLog").appendChild(d);$("chatLog").scrollTop=$("chatLog").scrollHeight}
-$("chatForm").addEventListener("submit",e=>{e.preventDefault();let v=$("chatInput").value.trim();if(!v)return;addBubble(v,"user");$("chatInput").value="";reply(v)});
-const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-$("voiceBtn").addEventListener("click",()=>{
- if(!SR){$("voiceHint").textContent="La dictée vocale n’est pas disponible ici. Utilise le champ de message ou le micro du clavier de l’iPhone.";return}
- const rec=new SR();rec.lang="fr-FR";rec.interimResults=false;
- $("voiceLabel").textContent="Je t’écoute…";rec.onresult=e=>{let v=e.results[0][0].transcript;$("chatInput").value=v;addBubble(v,"user");reply(v);$("voiceLabel").textContent="Parler à Baraka"};
- rec.onerror=()=>{$("voiceLabel").textContent="Parler à Baraka";$("voiceHint").textContent="Le micro n’a pas démarré. Vérifie l’autorisation du navigateur."};
- rec.onend=()=>{$("voiceLabel").textContent="Parler à Baraka"};try{rec.start()}catch{$("voiceLabel").textContent="Parler à Baraka"}
-});
-if("serviceWorker"in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
-render();
+(() => {
+  const KEY = "baraka.v2.data";
+  const $ = (id) => document.getElementById(id);
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {notes:[],tasks:[],projects:[]}; } catch { return {notes:[],tasks:[],projects:[]}; } };
+  let data = load();
+  const save = () => { localStorage.setItem(KEY, JSON.stringify(data)); render(); };
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const stamp = () => new Date().toLocaleString("fr-FR",{dateStyle:"medium",timeStyle:"short"});
+  const id = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random()));
+  const show = (view) => {
+    document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.view===view));
+    document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));
+    $(view+"View").classList.remove("hidden");
+  };
+  document.querySelectorAll(".tab").forEach(b=>b.addEventListener("click",()=>show(b.dataset.view)));
+  document.querySelectorAll("[data-jump]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.jump)));
+
+  function addCapture(text, type) {
+    const clean=text.trim(); if(!clean) return;
+    const entry={id:id(),text:clean,created:stamp()};
+    if(type==="task") data.tasks.unshift({...entry,done:false});
+    else data.notes.unshift(entry);
+    $("quickInput").value=""; save();
+  }
+  $("captureBtn").addEventListener("click",()=>addCapture($("quickInput").value,$("captureType").value));
+  $("quickInput").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addCapture($("quickInput").value,$("captureType").value);}});
+
+  $("projectBtn").addEventListener("click",()=>{
+    const name=$("projectInput").value.trim(); if(!name)return;
+    data.projects.unshift({id:id(),name,created:stamp(),status:"En cours"});
+    $("projectInput").value="";save();
+  });
+  $("projectInput").addEventListener("keydown",e=>{if(e.key==="Enter")$("projectBtn").click();});
+
+  function itemHTML(item, kind) {
+    if(kind==="task") return `<article class="item"><input class="check" type="checkbox" data-done="${item.id}" ${item.done?"checked":""} aria-label="Tâche terminée"><div class="item-main"><strong>${esc(item.text)}</strong><small>${esc(item.created)}</small></div><button class="icon-btn" data-delete="${kind}:${item.id}" aria-label="Supprimer">✕</button></article>`;
+    const title=kind==="project"?item.name:item.text;
+    return `<article class="item"><div class="item-main"><strong>${esc(title)}</strong><small>${kind==="project"?"Projet · ":""}${esc(item.created)}</small></div><button class="icon-btn" data-delete="${kind}:${item.id}" aria-label="Supprimer">✕</button></article>`;
+  }
+  function bindActions(){
+    document.querySelectorAll("[data-delete]").forEach(b=>b.addEventListener("click",()=>{
+      const [kind,itemId]=b.dataset.delete.split(":"); data[kind]=data[kind].filter(x=>x.id!==itemId);save();
+    }));
+    document.querySelectorAll("[data-done]").forEach(c=>c.addEventListener("change",()=>{
+      const t=data.tasks.find(x=>x.id===c.dataset.done);if(t){t.done=c.checked;save();}
+    }));
+  }
+  function render(){
+    $("noteCount").textContent=data.notes.length;
+    $("taskCount").textContent=data.tasks.filter(t=>!t.done).length;
+    $("projectCount").textContent=data.projects.length;
+    $("notesList").innerHTML=data.notes.map(n=>itemHTML(n,"note")).join("");
+    $("tasksList").innerHTML=data.tasks.map(t=>itemHTML(t,"task")).join("");
+    $("projectsList").innerHTML=data.projects.map(p=>itemHTML(p,"project")).join("");
+    $("notesEmpty").classList.toggle("hidden",data.notes.length>0);
+    $("tasksEmpty").classList.toggle("hidden",data.tasks.length>0);
+    $("projectsEmpty").classList.toggle("hidden",data.projects.length>0);
+    const recent=[...data.notes.map(x=>({...x,kind:"Note"})),...data.tasks.map(x=>({...x,kind:"Tâche"})),...data.projects.map(x=>({...x,text:x.name,kind:"Projet"}))].slice(0,4);
+    $("recentList").innerHTML=recent.length?recent.map(x=>`<article class="item"><div class="item-main"><strong>${esc(x.text)}</strong><small>${esc(x.kind)} · ${esc(x.created)}</small></div></article>`).join(""):`<p class="empty">Tes ajouts récents apparaîtront ici.</p>`;
+    bindActions();
+  }
+  $("todayLabel").textContent=new Date().toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  render();
+
+  const voiceBtn=$("voiceBtn"), voiceStatus=$("voiceStatus");
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SpeechRecognition){voiceBtn.disabled=true;voiceBtn.style.opacity=".45";voiceStatus.textContent="La dictée vocale n'est pas disponible dans ce navigateur. Tu peux toujours écrire ici.";}
+  else {
+    const rec=new SpeechRecognition();rec.lang="fr-FR";rec.interimResults=false;rec.maxAlternatives=1;
+    voiceBtn.addEventListener("click",()=>{
+      try{rec.start();voiceBtn.classList.add("listening");voiceStatus.textContent="J'écoute…";}catch{voiceStatus.textContent="La dictée est déjà en cours.";}
+    });
+    rec.onresult=e=>{const words=e.results[0][0].transcript;$("quickInput").value=words;$("quickInput").focus();voiceStatus.textContent="Texte reconnu. Vérifie-le puis ajoute-le comme note ou tâche.";};
+    rec.onerror=()=>voiceStatus.textContent="La dictée n'a pas fonctionné. Vérifie l'autorisation du micro ou écris ton idée.";
+    rec.onend=()=>voiceBtn.classList.remove("listening");
+  }
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+    window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+  }
+})();

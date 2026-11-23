@@ -1,1 +1,11 @@
-{"name":"Baraka – Assistant personnel","short_name":"Baraka","start_url":"./","display":"standalone","background_color":"#0c111c","theme_color":"#101522","lang":"fr","description":"Ton espace personnel pour notes et tâches."}
+{
+  "name": "Baraka — Ton espace personnel",
+  "short_name": "Baraka",
+  "description": "Un espace personnel pour penser, organiser et avancer.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": []
+}
